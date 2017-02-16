@@ -1,0 +1,51 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "CFT for etl",
+  "Resources" : {
+    "etlInstance": {
+      "Type" : "AWS::EC2::Instance",
+      "Properties" : {
+        "IamInstanceProfile" : "${aws.role}",
+        "ImageId" : "ami-bdhds3a0",
+        "InstanceInitiatedShutdownBehavior" : "terminate",
+        "InstanceType" : "${aws.ec2.etl.instance.type}",
+        "KeyName" : "key",
+        "SecurityGroupIds" : ${aws.ec2.etl.sg},
+        "SubnetId" : "subnet-cf4df91",
+        "Tags" : [ {
+          "Key": "Name",
+          "Value": "ETL"
+        } ],
+        "UserData" : {
+          "Fn::Base64":{
+            "Fn::Join":[
+              "",
+              [
+                "#!/bin/bash -v\n",
+                "echo -e \"UPDATING PACKAGES...\\n\"\n",
+                "sleep 30\n",
+                "sudo yum update -y\n",
+                "cd /home/ec2-user \n",
+                "mkdir data\n",
+                "echo -e \"GETTING FILES FROM S3...\\n\"\n",
+                "aws s3 sync s3://${aws.s3.bucket}/code/ . --include \"*\"\n",
+                "chmod ugo+x *.py *.sh\n",
+                "echo -e \"EXECUTING PROGRAM...\\n\"\n",
+                "ls -al\n",
+                "sudo ./master.sh ",
+                {"Ref": "AWS::StackName"},
+                " >> /home/ec2-user/master.log\n"
+              ]
+            ]
+          }
+        }
+      }
+    },
+    "EIP" : {
+      "Type" : "AWS::EC2::EIP",
+      "Properties" : {
+        "InstanceId" : { "Ref" : "etlInstance" }
+      }
+    }
+  }
+}
